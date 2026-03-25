@@ -4,16 +4,19 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ActivityIndi
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { supabase } from '../lib/supabase';
+import { useAuthStore } from '../stores/authStore';
 
 export default function FollowerFeedScreen({ navigation }: { navigation?: any }) {
+  const { user } = useAuthStore();
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchPosts = async () => {
     setLoading(true);
+    // Fetch posts, profiles, and all associated likes
     const { data, error } = await supabase
       .from('posts')
-      .select('*, profiles (name)')
+      .select('*, profiles(name), likes(*)')
       .order('created_at', { ascending: false });
     
     if (data) setPosts(data);
@@ -23,6 +26,30 @@ export default function FollowerFeedScreen({ navigation }: { navigation?: any })
   useEffect(() => {
     fetchPosts();
   }, []);
+
+  const toggleLike = async (postId: string, hasLiked: boolean, likeId?: string) => {
+    if (!user) return;
+    
+    // Optimistic UI Update
+    setPosts(prev => prev.map(p => {
+      if (p.id === postId) {
+        let newLikes = [...(p.likes || [])];
+        if (hasLiked) {
+          newLikes = newLikes.filter(l => l.user_id !== user.id);
+        } else {
+          newLikes.push({ id: 'temp', user_id: user.id, post_id: postId });
+        }
+        return { ...p, likes: newLikes };
+      }
+      return p;
+    }));
+
+    if (hasLiked && likeId) {
+      await supabase.from('likes').delete().eq('id', likeId);
+    } else {
+      await supabase.from('likes').insert({ user_id: user.id, post_id: postId });
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -53,6 +80,10 @@ export default function FollowerFeedScreen({ navigation }: { navigation?: any })
             const hours = Math.floor((new Date().getTime() - date.getTime()) / (1000 * 60 * 60));
             const timeAgo = hours > 24 ? Math.floor(hours / 24) + 'd' : (hours > 0 ? hours + 'h' : 'Just now');
 
+            const likesArray = item.likes || [];
+            const userLike = likesArray.find((l: any) => l.user_id === user?.id);
+            const hasLiked = !!userLike;
+
             return (
               <View style={styles.postCard}>
                 <View style={styles.postHeader}>
@@ -75,9 +106,9 @@ export default function FollowerFeedScreen({ navigation }: { navigation?: any })
                 <View style={styles.postFooter}>
                   <Text style={styles.outfitName}>{item.description || 'My Outfit'}</Text>
                   <View style={styles.postActions}>
-                    <TouchableOpacity style={styles.actionBtn}>
-                      <Text style={styles.actionIcon}>♡</Text>
-                      <Text style={styles.actionCount}>{item.likes_count || 0}</Text>
+                    <TouchableOpacity style={styles.actionBtn} onPress={() => toggleLike(item.id, hasLiked, userLike?.id)}>
+                      <Text style={[styles.actionIcon, hasLiked && { color: Colors.accent }]}>{hasLiked ? '♥' : '♡'}</Text>
+                      <Text style={styles.actionCount}>{likesArray.length}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.actionBtn}>
                       <Text style={styles.actionIcon}>💬</Text>
@@ -119,13 +150,12 @@ const styles = StyleSheet.create({
   },
   followButtonText: { ...Typography.label, color: Colors.silver, fontSize: 11 },
   postImage: {
-    height: 220, backgroundColor: Colors.obsidian, alignItems: 'center', justifyContent: 'center',
+    height: 380, backgroundColor: Colors.obsidian, alignItems: 'center', justifyContent: 'center',
   },
-  postEmoji: { fontSize: 80 },
   postFooter: { padding: 14, gap: 10 },
   outfitName: { ...Typography.body, color: Colors.cream, fontWeight: '600' },
   postActions: { flexDirection: 'row', gap: 16 },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  actionIcon: { fontSize: 18, color: Colors.silver },
+  actionIcon: { fontSize: 24, color: Colors.silver, marginTop: -4 },
   actionCount: { ...Typography.caption, color: Colors.silver },
 });

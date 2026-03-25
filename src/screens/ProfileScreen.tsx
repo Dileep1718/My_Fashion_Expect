@@ -52,6 +52,11 @@ export default function ProfileScreen({ navigation }: { navigation?: any }) {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.coverArt} />
+        <View style={styles.topRightActions}>
+          <TouchableOpacity onPress={() => navigation?.navigate('PremiumCart')} style={styles.cartBtn}>
+            <Text style={styles.cartIcon}>🛍️</Text>
+          </TouchableOpacity>
+        </View>
         <View style={styles.avatarWrapper}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{user?.name?.substring(0, 2).toUpperCase() || 'MO'}</Text>
@@ -137,6 +142,9 @@ const styles = StyleSheet.create({
     height: 140, backgroundColor: Colors.charcoal,
     borderBottomWidth: 0, borderColor: Colors.silver + '20',
   },
+  topRightActions: { position: 'absolute', top: 56, right: 24, flexDirection: 'row', gap: 12 },
+  cartBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' },
+  cartIcon: { fontSize: 20 },
   avatarWrapper: {
     position: 'absolute', bottom: 0, left: 24,
   },

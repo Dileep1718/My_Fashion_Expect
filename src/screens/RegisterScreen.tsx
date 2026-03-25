@@ -5,9 +5,14 @@ import {
   KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
+import { supabase } from '../lib/supabase';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { useAuthStore } from '../stores/authStore';
+
+WebBrowser.maybeCompleteAuthSession();
 
 type Props = { navigation: NativeStackNavigationProp<any> };
 
@@ -16,6 +21,27 @@ export default function RegisterScreen({ navigation }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const { signUp, isLoading, error } = useAuthStore();
+
+  const handleOAuth = async (provider: 'google' | 'apple') => {
+    try {
+      const redirectUrl = Linking.createURL('/auth/callback'); 
+      const { data, error: authError } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: redirectUrl,
+          skipBrowserRedirect: Platform.OS !== 'web'
+        },
+      });
+
+      if (authError) throw authError;
+
+      if (data?.url && Platform.OS !== 'web') {
+        const res = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+      }
+    } catch (e: any) {
+      console.warn(`[OAuth Error]: ${e.message}`);
+    }
+  };
 
   const handleRegister = async () => {
     try {
@@ -35,6 +61,21 @@ export default function RegisterScreen({ navigation }: Props) {
 
         <Text style={styles.headline}>Create your{'\n'}account.</Text>
         <Text style={styles.subheadline}>Join thousands of fashion-forward individuals.</Text>
+
+        <View style={styles.socialContainer}>
+          <TouchableOpacity style={styles.socialButton} onPress={() => handleOAuth('google')}>
+             <Text style={styles.socialButtonText}>Sign up with Google</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.socialButton} onPress={() => handleOAuth('apple')}>
+             <Text style={styles.socialButtonText}>Sign up with Apple</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>or</Text>
+          <View style={styles.dividerLine} />
+        </View>
 
         <View style={styles.form}>
           {[
@@ -91,6 +132,15 @@ const styles = StyleSheet.create({
   backText: { ...Typography.body, color: Colors.silver },
   headline: { ...Typography.h1, color: Colors.cream },
   subheadline: { ...Typography.body, color: Colors.silver },
+  socialContainer: { gap: 12, marginTop: 10 },
+  socialButton: {
+    height: 52, borderRadius: 14, borderWidth: 1, borderColor: Colors.silver + '40',
+    alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.charcoal,
+  },
+  socialButtonText: { ...Typography.body, color: Colors.cream },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 10 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: Colors.silver + '30' },
+  dividerText: { ...Typography.caption, color: Colors.silver },
   form: { gap: 14 },
   inputWrapper: { gap: 6 },
   inputLabel: { ...Typography.label, color: Colors.silver, textTransform: 'uppercase' },

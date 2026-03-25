@@ -13,6 +13,9 @@ import { tryOnOutfit, TryOnResult } from '../services/aiTryOn.service';
 import { useBodyStore } from '../stores/bodyStore';
 import AvatarCanvas from '../components/AvatarCanvas';
 import { useNavigation } from '@react-navigation/native';
+import { supabase } from '../lib/supabase';
+import { useAuthStore } from '../stores/authStore';
+import { decode } from 'base64-arraybuffer';
 
 type ViewMode = '3d' | 'ai';
 
@@ -21,11 +24,12 @@ const GARMENT_COLORS = ['#C4A882', '#4F7EFF', '#E03E3E', '#4CAF78', '#C47FE0', '
 
 export default function TryOnScreen() {
   const { modelParams, loadFromStorage, hydrated } = useBodyStore();
+  const { user } = useAuthStore();
   const navigation = useNavigation<any>();
 
   const [viewMode, setViewMode]   = useState<ViewMode>('3d');
-  const [userPhoto, setUserPhoto] = useState<string | null>(null);
-  const [garmentUri, setGarmentUri] = useState<string | null>(null);
+  const [userPhoto, setUserPhoto] = useState<{ uri: string, base64: string } | null>(null);
+  const [garment, setGarment] = useState<{ uri: string, base64: string } | null>(null);
   const [garmentColor, setGarmentColor] = useState(GARMENT_COLORS[0]);
   const [loading, setLoading]     = useState(false);
   const [result, setResult]       = useState<TryOnResult | null>(null);
@@ -36,48 +40,58 @@ export default function TryOnScreen() {
 
   // ── Photo pickers ──────────────────────────────────────────────────────────
   const pickUserPhoto = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert('Permission needed', 'Allow photo library access to pick your photo.');
-      return;
-    }
     const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: 'images' as any,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [3, 4],
       quality: 0.8,
+      base64: true,
     });
-    if (!res.canceled) setUserPhoto(res.assets[0].uri);
+    if (!res.canceled && res.assets[0].base64) {
+      setUserPhoto({ uri: res.assets[0].uri, base64: res.assets[0].base64 });
+      setResult(null);
+    }
   };
 
   const pickGarment = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert('Permission needed', 'Allow photo library access to pick a garment image.');
-      return;
-    }
     const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: 'images' as any,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [3, 4],
       quality: 0.8,
+      base64: true,
     });
-    if (!res.canceled) {
-      setGarmentUri(res.assets[0].uri);
-      // Also cycle garment colour for visual feedback when no real overlay
+    if (!res.canceled && res.assets[0].base64) {
+      setGarment({ uri: res.assets[0].uri, base64: res.assets[0].base64 });
       setGarmentColor(GARMENT_COLORS[Math.floor(Math.random() * GARMENT_COLORS.length)]);
-      setResult(null); // reset previous result
+      setResult(null);
     }
   };
 
   // ── Try-On trigger ─────────────────────────────────────────────────────────
   const handleTryOn = async () => {
+    if (!userPhoto || !garment || !user) {
+      Alert.alert('Required', 'Please select both your photo and a garment.');
+      return;
+    }
+
     setLoading(true);
     setResult(null);
     try {
+      // 1. Upload User Photo Buffer to Supabase
+      const modelPath = `tryon/${user.id}/${Date.now()}_model.jpg`;
+      await supabase.storage.from('app_images').upload(modelPath, decode(userPhoto.base64), { contentType: 'image/jpeg' });
+      const { data: modelData } = supabase.storage.from('app_images').getPublicUrl(modelPath);
+
+      // 2. Upload Garment Photo Buffer to Supabase
+      const garmentPath = `tryon/${user.id}/${Date.now()}_garment.jpg`;
+      await supabase.storage.from('app_images').upload(garmentPath, decode(garment.base64), { contentType: 'image/jpeg' });
+      const { data: garmentData } = supabase.storage.from('app_images').getPublicUrl(garmentPath);
+
+      // 3. Dispatch to AI Engine
       const res = await tryOnOutfit({
-        userPhotoUri: userPhoto ?? 'placeholder',
-        garmentImageUri: garmentUri ?? 'placeholder',
+        userPhotoUri: modelData.publicUrl,
+        garmentImageUri: garmentData.publicUrl,
         mode: 'photorealistic',
       });
       setResult(res);
@@ -201,8 +215,8 @@ export default function TryOnScreen() {
 
       {/* Photo pickers */}
       <View style={styles.pickerRow}>
-        {renderPhotoSlot('Your Photo', userPhoto, pickUserPhoto, true)}
-        {renderPhotoSlot('Garment', garmentUri, pickGarment, false)}
+        {renderPhotoSlot('Your Photo', userPhoto?.uri || null, pickUserPhoto, true)}
+        {renderPhotoSlot('Garment', garment?.uri || null, pickGarment, false)}
       </View>
 
       {/* How it works */}

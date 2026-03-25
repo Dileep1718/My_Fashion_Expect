@@ -12,7 +12,7 @@ const CATEGORIES = ['TOP', 'BOTTOM', 'FOOTWEAR', 'ACCESSORY'];
 const { width } = Dimensions.get('window');
 const ITEM_SIZE = (width - 48 - 16) / 3;
 
-export default function VirtualClosetScreen() {
+export default function VirtualClosetScreen({ navigation }: { navigation?: any }) {
   const { user } = useAuthStore();
   const [items, setItems] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('TOP');
@@ -94,8 +94,15 @@ export default function VirtualClosetScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headline}>Your Closet</Text>
-        <Text style={styles.subheadline}>Digitize your wardrobe for AI styling.</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View>
+            <Text style={styles.headline}>Your Closet</Text>
+            <Text style={styles.subheadline}>Digitize your wardrobe for AI styling.</Text>
+          </View>
+          <TouchableOpacity style={styles.aiButton} onPress={() => navigation?.navigate('OutfitSuggestion')}>
+            <Text style={styles.aiButtonText}>AI Stylist 🪄</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.tabsRow}>
@@ -182,7 +189,12 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.obsidian },
   header: { paddingHorizontal: 24, paddingTop: 60, paddingBottom: 16 },
   headline: { ...Typography.h1, color: Colors.cream },
-  subheadline: { ...Typography.body, color: Colors.silver },
+  subheadline: { ...Typography.body, color: Colors.silver, marginTop: 4 },
+  aiButton: {
+    backgroundColor: Colors.accent + '20', borderWidth: 1, borderColor: Colors.accent,
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, marginTop: 4
+  },
+  aiButtonText: { ...Typography.label, color: Colors.accent },
   
   tabsRow: {
     flexDirection: 'row', paddingHorizontal: 24, gap: 12, marginBottom: 16,

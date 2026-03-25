@@ -1,45 +1,65 @@
-// src/screens/SettingsScreen.tsx
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
-
-const SETTINGS_SECTIONS = [
-  {
-    title: 'Account',
-    items: [
-      { label: 'Edit Profile', icon: '👤', type: 'nav' },
-      { label: 'Change Password', icon: '🔑', type: 'nav' },
-      { label: 'Linked Accounts', icon: '🔗', type: 'nav' },
-    ],
-  },
-  {
-    title: 'Preferences',
-    items: [
-      { label: 'Dark Mode', icon: '🌙', type: 'toggle', value: true },
-      { label: 'Outfit Reminders', icon: '🔔', type: 'toggle', value: false },
-      { label: 'AI Suggestions', icon: '🪄', type: 'toggle', value: true },
-    ],
-  },
-  {
-    title: 'Privacy',
-    items: [
-      { label: 'Profile Visibility', icon: '👁', type: 'nav' },
-      { label: 'Data & Analytics', icon: '📊', type: 'nav' },
-      { label: 'Delete Account', icon: '🗑', type: 'nav', danger: true },
-    ],
-  },
-  {
-    title: 'About',
-    items: [
-      { label: 'App Version', icon: 'ℹ️', type: 'value', value: '1.0.0-alpha' },
-      { label: 'Terms of Service', icon: '📄', type: 'nav' },
-      { label: 'Privacy Policy', icon: '🛡', type: 'nav' },
-    ],
-  },
-];
+import { useAuthStore } from '../stores/authStore';
+import { supabase } from '../lib/supabase';
 
 export default function SettingsScreen({ navigation }: { navigation?: any }) {
+  const { user, signOut } = useAuthStore();
+  const [isPublic, setIsPublic] = useState(true);
+
+  useEffect(() => {
+    if (user) {
+      supabase.from('profiles').select('is_public').eq('id', user.id).single()
+        .then(({ data }) => {
+           if (data) setIsPublic(data.is_public);
+        });
+    }
+  }, [user]);
+
+  const togglePublic = async (val: boolean) => {
+    setIsPublic(val);
+    if (!user) return;
+    try {
+      const { error } = await supabase.from('profiles').update({ is_public: val }).eq('id', user.id);
+      if (error) throw error;
+    } catch (e) {
+      console.warn('Failed to update privacy settings', e);
+      setIsPublic(!val); // Revert
+    }
+  };
+
+  const handleSignOut = () => {
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Sign Out', style: 'destructive', onPress: async () => {
+          await signOut();
+          navigation?.replace('Auth');
+      }}
+    ]);
+  };
+
+  const renderSection = (title: string, children: React.ReactNode) => (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <View style={styles.sectionCard}>
+        {children}
+      </View>
+    </View>
+  );
+
+  const renderRow = (icon: string, label: string, trailing: React.ReactNode, hideDivider = false, danger = false) => (
+    <View>
+      <View style={styles.settingRow}>
+        <Text style={styles.settingIcon}>{icon}</Text>
+        <Text style={[styles.settingLabel, danger && styles.dangerText]}>{label}</Text>
+        {trailing}
+      </View>
+      {!hideDivider && <View style={styles.divider} />}
+    </View>
+  );
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
@@ -49,37 +69,27 @@ export default function SettingsScreen({ navigation }: { navigation?: any }) {
         <Text style={styles.headline}>Settings</Text>
       </View>
 
-      {SETTINGS_SECTIONS.map((section) => (
-        <View key={section.title} style={styles.section}>
-          <Text style={styles.sectionTitle}>{section.title}</Text>
-          <View style={styles.sectionCard}>
-            {section.items.map((item, i) => (
-              <View key={item.label}>
-                <View style={styles.settingRow}>
-                  <Text style={styles.settingIcon}>{item.icon}</Text>
-                  <Text style={[styles.settingLabel, (item as any).danger && styles.dangerText]}>
-                    {item.label}
-                  </Text>
-                  {item.type === 'toggle' ? (
-                    <Switch
-                      value={(item as any).value}
-                      trackColor={{ false: Colors.charcoal, true: Colors.accent }}
-                      thumbColor={Colors.cream}
-                    />
-                  ) : item.type === 'value' ? (
-                    <Text style={styles.valueText}>{(item as any).value}</Text>
-                  ) : (
-                    <Text style={styles.chevron}>›</Text>
-                  )}
-                </View>
-                {i < section.items.length - 1 && <View style={styles.divider} />}
-              </View>
-            ))}
-          </View>
-        </View>
-      ))}
+      {renderSection('Account', <>
+        {renderRow('👤', 'Edit Profile', <Text style={styles.chevron}>›</Text>)}
+        {renderRow('🔑', 'Change Password', <Text style={styles.chevron}>›</Text>)}
+        {renderRow('🔗', 'Linked Accounts', <Text style={styles.chevron}>›</Text>, true)}
+      </>)}
 
-      <TouchableOpacity style={styles.signOutButton}>
+      {renderSection('Privacy', <>
+        {renderRow('👁', 'Public Profile Visibility', 
+          <Switch value={isPublic} onValueChange={togglePublic} trackColor={{ false: Colors.charcoal, true: Colors.accent }} thumbColor={Colors.cream} />
+        )}
+        {renderRow('📊', 'Data & Analytics', <Text style={styles.chevron}>›</Text>)}
+        {renderRow('🗑', 'Delete Account', <Text style={styles.chevron}>›</Text>, true, true)}
+      </>)}
+
+      {renderSection('About', <>
+        {renderRow('ℹ️', 'App Version', <Text style={styles.valueText}>1.0.0-rc1</Text>)}
+        {renderRow('📄', 'Terms of Service', <Text style={styles.chevron}>›</Text>)}
+        {renderRow('🛡', 'Privacy Policy', <Text style={styles.chevron}>›</Text>, true)}
+      </>)}
+
+      <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
         <Text style={styles.signOutText}>Sign Out</Text>
       </TouchableOpacity>
     </ScrollView>

@@ -11,9 +11,14 @@ import {
   ScrollView,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
+import { supabase } from '../lib/supabase';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { useAuthStore } from '../stores/authStore';
+
+WebBrowser.maybeCompleteAuthSession();
 
 type Props = { navigation: NativeStackNavigationProp<any> };
 
@@ -22,6 +27,27 @@ export default function LoginScreen({ navigation }: Props) {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const { signIn, isLoading, error, user } = useAuthStore();
+
+  const handleOAuth = async (provider: 'google' | 'apple') => {
+    try {
+      const redirectUrl = Linking.createURL('/auth/callback'); 
+      const { data, error: authError } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: redirectUrl,
+          skipBrowserRedirect: Platform.OS !== 'web'
+        },
+      });
+
+      if (authError) throw authError;
+
+      if (data?.url && Platform.OS !== 'web') {
+        const res = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+      }
+    } catch (e: any) {
+      console.warn(`[OAuth Error]: ${e.message}`);
+    }
+  };
 
   const handleLogin = async () => {
     try {
@@ -33,7 +59,7 @@ export default function LoginScreen({ navigation }: Props) {
         navigation.replace('StyleQuiz');
       }
     } catch (e) {
-      // Error is handled in the store, just prevent navigation
+      // Error is handled in the store
     }
   };
 
@@ -58,11 +84,12 @@ export default function LoginScreen({ navigation }: Props) {
 
         {/* Social Sign-in */}
         <View style={styles.socialContainer}>
-          {['Continue with Google', 'Continue with Apple'].map((label) => (
-            <TouchableOpacity key={label} style={styles.socialButton}>
-              <Text style={styles.socialButtonText}>{label}</Text>
-            </TouchableOpacity>
-          ))}
+          <TouchableOpacity style={styles.socialButton} onPress={() => handleOAuth('google')}>
+            <Text style={styles.socialButtonText}>Continue with Google</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.socialButton} onPress={() => handleOAuth('apple')}>
+            <Text style={styles.socialButtonText}>Continue with Apple</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Divider */}
