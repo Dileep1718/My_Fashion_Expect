@@ -76,7 +76,10 @@ export default function OOTDPostScreen({ navigation }: { navigation?: any }) {
           contentType: `image/${ext}`
         });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('[Storage Error]:', uploadError);
+        throw new Error(`STORAGE_ERROR: ${uploadError.message}`);
+      }
 
       // 2. Get Public URL
       const { data: { publicUrl } } = supabase.storage.from('app_images').getPublicUrl(fileName);
@@ -89,7 +92,10 @@ export default function OOTDPostScreen({ navigation }: { navigation?: any }) {
         likes_count: 0
       });
 
-      if (dbError) throw dbError;
+      if (dbError) {
+        console.error('[Posts Table Error]:', dbError);
+        throw new Error(`DB_POSTS_ERROR: ${dbError.message}`);
+      }
 
       // 4. Update daily streak counters on the user profile (if columns exist).
       try {
