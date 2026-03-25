@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Image, ActivityIndicator, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { decode } from 'base64-arraybuffer';
+
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { supabase } from '../lib/supabase';
@@ -13,7 +14,7 @@ const MOODS = ['✦ Confident', '🔥 Fire', '🌿 Chill', '🖤 Edgy', '💫 Dr
 export default function OOTDPostScreen({ navigation }: { navigation?: any }) {
   const [caption, setCaption] = useState('');
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
-  const [image, setImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [image, setImage] = useState<{ uri: string; base64: string } | null>(null);
   const [isPosting, setIsPosting] = useState(false);
   const { user } = useAuthStore();
 
@@ -26,8 +27,8 @@ export default function OOTDPostScreen({ navigation }: { navigation?: any }) {
       base64: true,
     });
 
-    if (!result.canceled && result.assets?.length > 0) {
-      setImage(result.assets[0]);
+    if (!result.canceled && result.assets?.length > 0 && result.assets[0].base64) {
+      setImage({ uri: result.assets[0].uri, base64: result.assets[0].base64 });
     }
   };
 
@@ -67,13 +68,17 @@ export default function OOTDPostScreen({ navigation }: { navigation?: any }) {
     setIsPosting(true);
     try {
       // 1. Upload Image to Supabase Storage
-      const ext = image.uri.split('.').pop() || 'jpg';
+      // Use base64 → decode() — same pattern as VirtualClosetScreen / TryOnScreen.
+      // fetch(localUri) fails on Android with "Network request failed".
+      const ext = (image.uri.split('.').pop()?.toLowerCase() || 'jpg').replace('jpeg', 'jpg');
       const fileName = `${user.id}/${Date.now()}.${ext}`;
-      
+      const contentType = ext === 'png' ? 'image/png' : 'image/jpeg';
+
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('app_images')
-        .upload(fileName, decode(image.base64!), {
-          contentType: `image/${ext}`
+        .upload(fileName, decode(image.base64), {
+          contentType,
+          upsert: false,
         });
 
       if (uploadError) {

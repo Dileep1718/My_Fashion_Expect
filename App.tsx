@@ -3,36 +3,43 @@ import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import RootNavigator from './src/navigation/RootNavigator';
-import { supabase } from './src/lib/supabase';
 import { useAuthStore } from './src/stores/authStore';
+import { auth } from './src/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { supabase } from './src/lib/supabase';
 
 export default function App() {
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser?.email) {
+        // Lookup the native PostgreSQL UUID attached to this Firebase email
         const { data: profile } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', session.user.id)
+          .eq('email', firebaseUser.email)
           .single();
 
-        useAuthStore.setState({
-          isAuthenticated: true,
-          user: {
-            id: session.user.id,
-            email: session.user.email || '',
-            name: profile?.name || session.user.email?.split('@')[0],
-            stylePreferences: profile?.style_preferences,
-          },
-        });
+        if (profile) {
+          useAuthStore.setState({
+            isAuthenticated: true,
+            user: {
+              id: profile.id, // the required native UUID
+              email: profile.email || '',
+              name: profile.name || firebaseUser.email.split('@')[0],
+              stylePreferences: profile.style_preferences,
+            },
+          });
+        } else {
+          // If profile lookup fails natively, drop the session state
+          useAuthStore.setState({ isAuthenticated: false, user: null });
+        }
       } else {
+        // Logged out natively in Firebase
         useAuthStore.setState({ isAuthenticated: false, user: null });
       }
     });
 
-    return () => {
-      subscription.unsubscribe();
-    };
+    return () => unsubscribe();
   }, []);
 
   return (
@@ -44,3 +51,5 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
+
+

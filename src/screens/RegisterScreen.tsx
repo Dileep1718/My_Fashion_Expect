@@ -24,22 +24,9 @@ export default function RegisterScreen({ navigation }: Props) {
 
   const handleOAuth = async (provider: 'google' | 'apple') => {
     try {
-      const redirectUrl = Linking.createURL('/auth/callback'); 
-      const { data, error: authError } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: {
-          redirectTo: redirectUrl,
-          skipBrowserRedirect: Platform.OS !== 'web'
-        },
-      });
-
-      if (authError) throw authError;
-
-      if (data?.url && Platform.OS !== 'web') {
-        const res = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
-      }
-    } catch (e: any) {
-      console.warn(`[OAuth Error]: ${e.message}`);
+      alert('Notice: OAuth is disabled. Please use Email/Password during this testing phase.');
+    } catch (err: any) {
+      console.warn(`[OAuth Error]: ${err.message}`);
     }
   };
 

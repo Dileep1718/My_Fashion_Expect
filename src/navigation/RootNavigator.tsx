@@ -18,6 +18,11 @@ import HairstyleStudioScreen from '../screens/HairstyleStudioScreen';
 import PremiumCartScreen from '../screens/PremiumCartScreen';
 import PostCommentsScreen from '../screens/PostCommentsScreen';
 import SharedCartScreen from '../screens/SharedCartScreen';
+import EditProfileScreen from '../screens/EditProfileScreen';
+import PostViewerScreen from '../screens/PostViewerScreen';
+import StoryViewerScreen from '../screens/StoryViewerScreen';
+import StoryCreateScreen from '../screens/StoryCreateScreen';
+import UserProfileScreen from '../screens/UserProfileScreen';
 
 export type RootStackParamList = {
   Splash: undefined;
@@ -36,6 +41,11 @@ export type RootStackParamList = {
   PremiumCart: undefined;
   PostComments: { postId: string };
   SharedCart: { ownerId: string };
+  EditProfile: undefined;
+  PostViewer: { post: any };
+  StoryViewer: { stories: any[]; startIndex?: number };
+  StoryCreate: undefined;
+  UserProfile: { userId: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -69,6 +79,11 @@ export default function RootNavigator() {
         <Stack.Screen name="PremiumCart" component={PremiumCartScreen} />
         <Stack.Screen name="PostComments" component={PostCommentsScreen} />
         <Stack.Screen name="SharedCart" component={SharedCartScreen} />
+        <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+        <Stack.Screen name="PostViewer" component={PostViewerScreen} />
+        <Stack.Screen name="StoryViewer" component={StoryViewerScreen} />
+        <Stack.Screen name="StoryCreate" component={StoryCreateScreen} />
+        <Stack.Screen name="UserProfile" component={UserProfileScreen} />
       </Stack.Group>
     </Stack.Navigator>
   );
