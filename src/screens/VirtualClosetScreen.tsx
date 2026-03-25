@@ -28,9 +28,11 @@ export default function VirtualClosetScreen({ navigation }: { navigation?: any }
 
   const fetchWardrobe = async () => {
     setLoading(true);
+    if (!user) return;
     const { data } = await supabase
       .from('wardrobe_items')
       .select('*')
+      .eq('user_id', user.id)
       .eq('category', activeTab)
       .order('created_at', { ascending: false });
     

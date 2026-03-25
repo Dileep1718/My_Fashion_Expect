@@ -1,116 +1,303 @@
-// src/screens/SearchScreen.tsx
-import React, { useState } from 'react';
+// src/screens/SearchScreen.tsx — Discover & Search Users
+import React, { useState, useCallback, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, Dimensions,
+  View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList,
+  Image, ActivityIndicator, Dimensions, StatusBar
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
-
-const TRENDING_TAGS = ['#MinimalChic', '#StreetCore', '#CozyFit', '#GlamNight', '#BohoEdit', '#EdgyLook'];
-const RESULTS = [
-  { id: '1', emoji: '◻️', label: 'Minimal White Set', views: '12K' },
-  { id: '2', emoji: '🧢', label: 'Street Core Drip', views: '8.3K' },
-  { id: '3', emoji: '🌿', label: 'Boho Summer Look', views: '6.1K' },
-  { id: '4', emoji: '✨', label: 'Glam Evening Fit', views: '4.9K' },
-];
+import { supabase } from '../lib/supabase';
+import { useAuthStore } from '../stores/authStore';
 
 const { width } = Dimensions.get('window');
-const CARD_W = (width - 48 - 12) / 2;
 
-export default function SearchScreen() {
+interface UserResult {
+  id: string;
+  name: string;
+  nickname: string | null;
+  avatar_url: string | null;
+  bio: string | null;
+  is_public: boolean;
+}
+
+function UserCard({ user, currentUserId, navigation }: { user: UserResult; currentUserId: string; navigation?: any }) {
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    // Check follow status
+    supabase
+      .from('follows')
+      .select('id')
+      .eq('follower_id', currentUserId)
+      .eq('following_id', user.id)
+      .maybeSingle()
+      .then(({ data }) => setIsFollowing(!!data));
+  }, [user.id]);
+
+  const toggleFollow = async () => {
+    setLoading(true);
+    if (isFollowing) {
+      await supabase.from('follows').delete().match({ follower_id: currentUserId, following_id: user.id });
+      setIsFollowing(false);
+    } else {
+      await supabase.from('follows').insert({ follower_id: currentUserId, following_id: user.id });
+      setIsFollowing(true);
+    }
+    setLoading(false);
+  };
+
+  const displayName = user.nickname || user.name || 'user';
+  const username = (user.name || 'user').replace(/\s+/g, '').toLowerCase();
+  const avatarLetter = displayName.charAt(0).toUpperCase();
+  const isMe = user.id === currentUserId;
+
+  return (
+    <TouchableOpacity
+      style={styles.userCard}
+      onPress={() => {
+        if (isMe) {
+          navigation?.navigate('Main', { screen: 'Profile' });
+        } else {
+          navigation?.navigate('UserProfile', { userId: user.id });
+        }
+      }}
+      activeOpacity={0.8}
+    >
+      {/* Avatar */}
+      <View style={styles.avatarWrap}>
+        {user.avatar_url ? (
+          <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
+        ) : (
+          <View style={[styles.avatar, styles.avatarFallback]}>
+            <Text style={styles.avatarLetter}>{avatarLetter}</Text>
+          </View>
+        )}
+        {!user.is_public && (
+          <View style={styles.lockBadge}><Text style={styles.lockIcon}>🔒</Text></View>
+        )}
+      </View>
+
+      {/* Info */}
+      <View style={styles.userInfo}>
+        <Text style={styles.displayName}>{displayName}</Text>
+        <Text style={styles.username}>@{username}</Text>
+        {user.bio ? <Text style={styles.bio} numberOfLines={1}>{user.bio}</Text> : null}
+      </View>
+
+      {/* Follow / You */}
+      {!isMe && (
+        <TouchableOpacity
+          style={[styles.followBtn, isFollowing && styles.followingBtn]}
+          onPress={toggleFollow}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color={isFollowing ? Colors.silver : Colors.obsidian} />
+          ) : (
+            <Text style={[styles.followBtnText, isFollowing && styles.followingBtnText]}>
+              {isFollowing ? 'Following' : 'Follow'}
+            </Text>
+          )}
+        </TouchableOpacity>
+      )}
+      {isMe && <View style={styles.youBadge}><Text style={styles.youBadgeText}>You</Text></View>}
+    </TouchableOpacity>
+  );
+}
+
+export default function SearchScreen({ navigation }: { navigation?: any }) {
+  const { user } = useAuthStore();
   const [query, setQuery] = useState('');
-  const [focused, setFocused] = useState(false);
+  const [results, setResults] = useState<UserResult[]>([]);
+  const [suggested, setSuggested] = useState<UserResult[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [hasFetched, setHasFetched] = useState(false);
+
+  // Load suggested users (all public profiles minus self) on mount
+  const loadSuggested = useCallback(async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, name, nickname, avatar_url, bio, is_public')
+      .neq('id', user.id)
+      .eq('is_public', true)
+      .order('name')
+      .limit(30);
+    setSuggested(data || []);
+  }, [user]);
+
+  useFocusEffect(useCallback(() => { loadSuggested(); }, [loadSuggested]));
+
+  useEffect(() => {
+    if (!query.trim()) {
+      setResults([]);
+      setHasFetched(false);
+      return;
+    }
+    const delay = setTimeout(async () => {
+      if (!user) return;
+      setLoading(true);
+      const cleaned = query.trim().toLowerCase();
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, name, nickname, avatar_url, bio, is_public')
+        .or(`name.ilike.%${cleaned}%,nickname.ilike.%${cleaned}%`)
+        .neq('id', user.id)
+        .limit(25);
+      setResults(data || []);
+      setLoading(false);
+      setHasFetched(true);
+    }, 350); // debounce
+    return () => clearTimeout(delay);
+  }, [query]);
+
+  const listData = query.trim() ? results : suggested;
+  const isSearching = query.trim().length > 0;
 
   return (
     <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
+
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.title}>Discover ✦</Text>
+        <Text style={styles.subtitle}>Find fashion people to follow</Text>
+      </View>
+
       {/* Search Bar */}
-      <View style={styles.searchArea}>
-        <Text style={styles.headline}>Explore</Text>
-        <View style={[styles.searchBar, focused && styles.searchBarFocused]}>
-          <Text style={styles.searchIcon}>🔍</Text>
+      <View style={styles.searchRow}>
+        <View style={styles.searchBox}>
+          <Text style={styles.searchIcon}>⌕</Text>
           <TextInput
             style={styles.searchInput}
             value={query}
             onChangeText={setQuery}
-            placeholder="Search styles, outfits, tags…"
+            placeholder="Search users by name..."
             placeholderTextColor={Colors.silver + '60'}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
+            autoCorrect={false}
+            autoCapitalize="none"
           />
           {query.length > 0 && (
-            <TouchableOpacity onPress={() => setQuery('')}>
-              <Text style={styles.clearIcon}>✕</Text>
+            <TouchableOpacity onPress={() => setQuery('')} style={styles.clearBtn}>
+              <Text style={styles.clearBtnText}>✕</Text>
             </TouchableOpacity>
           )}
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Trending tags */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>TRENDING NOW</Text>
-          <View style={styles.tagWrap}>
-            {TRENDING_TAGS.map((tag) => (
-              <TouchableOpacity key={tag} style={styles.trendTag} onPress={() => setQuery(tag)}>
-                <Text style={styles.trendTagText}>{tag}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+      {/* Section Label */}
+      <Text style={styles.sectionLabel}>
+        {isSearching ? `Results for "${query}"` : '🌟 Suggested people to follow'}
+      </Text>
 
-        {/* Results grid */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>{query ? `RESULTS FOR "${query}"` : 'POPULAR THIS WEEK'}</Text>
-          <View style={styles.resultsGrid}>
-            {RESULTS.map((item, i) => (
-              <TouchableOpacity
-                key={item.id}
-                style={[styles.resultCard, i === 0 && { width: '100%', height: 160 }]}
-              >
-                <Text style={styles.resultEmoji}>{item.emoji}</Text>
-                <View style={styles.resultFooter}>
-                  <Text style={styles.resultLabel} numberOfLines={1}>{item.label}</Text>
-                  <Text style={styles.resultViews}>{item.views} views</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      </ScrollView>
+      {/* List */}
+      {loading ? (
+        <ActivityIndicator color={Colors.accent} style={{ marginTop: 40 }} />
+      ) : (
+        <FlatList
+          data={listData}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyEmoji}>{isSearching ? '🔍' : '✦'}</Text>
+              <Text style={styles.emptyTitle}>
+                {isSearching && hasFetched ? 'No users found' : isSearching ? 'Searching…' : 'No suggestions yet'}
+              </Text>
+              <Text style={styles.emptyText}>
+                {isSearching ? 'Try a different name or username' : 'Be the first to post and get discovered!'}
+              </Text>
+            </View>
+          }
+          renderItem={({ item }) => (
+            <UserCard
+              user={item}
+              currentUserId={user?.id || ''}
+              navigation={navigation}
+            />
+          )}
+        />
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.obsidian },
-  searchArea: { paddingHorizontal: 24, paddingTop: 60, paddingBottom: 12, gap: 12 },
-  headline: { ...Typography.h1, color: Colors.cream },
-  searchBar: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: Colors.charcoal, borderRadius: 14, paddingHorizontal: 14, height: 52,
-    borderWidth: 1, borderColor: Colors.silver + '25',
+
+  header: {
+    paddingTop: 60, paddingHorizontal: 24, paddingBottom: 16,
   },
-  searchBarFocused: { borderColor: Colors.accent + '80' },
-  searchIcon: { fontSize: 16 },
-  searchInput: { flex: 1, color: Colors.cream, fontSize: 15 },
-  clearIcon: { color: Colors.silver, fontSize: 14 },
-  content: { paddingHorizontal: 24, paddingBottom: 100, gap: 24 },
-  section: { gap: 12 },
-  sectionLabel: { ...Typography.label, color: Colors.silver, textTransform: 'uppercase' },
-  tagWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  trendTag: {
-    paddingHorizontal: 14, paddingVertical: 7, backgroundColor: Colors.charcoal,
-    borderRadius: 100, borderWidth: 1, borderColor: Colors.silver + '25',
+  title: { ...Typography.h1, color: Colors.cream, letterSpacing: 0.3 },
+  subtitle: { ...Typography.body, color: Colors.silver, marginTop: 4 },
+
+  searchRow: { paddingHorizontal: 20, marginBottom: 8 },
+  searchBox: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: Colors.charcoal,
+    borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12,
+    borderWidth: 1, borderColor: Colors.silver + '20', gap: 10,
   },
-  trendTagText: { ...Typography.label, color: Colors.cream, fontSize: 12 },
-  resultsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  resultCard: {
-    width: CARD_W, height: 140, backgroundColor: Colors.charcoal, borderRadius: 18,
-    padding: 14, justifyContent: 'space-between',
-    borderWidth: 1, borderColor: Colors.silver + '15',
+  searchIcon: { fontSize: 18, color: Colors.silver },
+  searchInput: {
+    flex: 1, color: Colors.cream, fontSize: 15, padding: 0,
   },
-  resultEmoji: { fontSize: 36 },
-  resultFooter: { gap: 3 },
-  resultLabel: { ...Typography.body, color: Colors.cream, fontWeight: '600', fontSize: 13 },
-  resultViews: { ...Typography.caption, color: Colors.silver },
+  clearBtn: { paddingHorizontal: 4 },
+  clearBtnText: { color: Colors.silver, fontSize: 16 },
+
+  sectionLabel: {
+    ...Typography.label, color: Colors.silver,
+    paddingHorizontal: 24, paddingBottom: 12, fontSize: 12, textTransform: 'uppercase', opacity: 0.7,
+  },
+
+  list: { paddingHorizontal: 20, paddingBottom: 120, gap: 2 },
+
+  userCard: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 12, paddingHorizontal: 6,
+    borderBottomWidth: 1, borderBottomColor: Colors.silver + '10',
+    gap: 14,
+  },
+  avatarWrap: { position: 'relative' },
+  avatar: { width: 52, height: 52, borderRadius: 26, borderWidth: 2, borderColor: Colors.charcoal },
+  avatarFallback: { backgroundColor: Colors.accent + '30', alignItems: 'center', justifyContent: 'center' },
+  avatarLetter: { color: Colors.accent, fontWeight: '700', fontSize: 18 },
+  lockBadge: {
+    position: 'absolute', bottom: -2, right: -2,
+    backgroundColor: Colors.obsidian, borderRadius: 8,
+  },
+  lockIcon: { fontSize: 11 },
+
+  userInfo: { flex: 1, gap: 2 },
+  displayName: { ...Typography.label, color: Colors.cream, fontSize: 15 },
+  username: { ...Typography.caption, color: Colors.silver, fontSize: 12 },
+  bio: { ...Typography.caption, color: Colors.silver + '80', fontSize: 12, marginTop: 2 },
+
+  followBtn: {
+    paddingHorizontal: 18, paddingVertical: 9,
+    backgroundColor: Colors.accent, borderRadius: 22,
+    minWidth: 84, alignItems: 'center',
+  },
+  followingBtn: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5, borderColor: Colors.silver + '40',
+  },
+  followBtnText: { color: Colors.obsidian, fontWeight: '700', fontSize: 13 },
+  followingBtnText: { color: Colors.silver },
+
+  youBadge: {
+    paddingHorizontal: 14, paddingVertical: 7,
+    backgroundColor: Colors.charcoal, borderRadius: 22,
+    borderWidth: 1, borderColor: Colors.silver + '20',
+  },
+  youBadgeText: { color: Colors.silver, fontSize: 12, fontWeight: '600' },
+
+  emptyState: { alignItems: 'center', paddingTop: 60, gap: 12, paddingHorizontal: 32 },
+  emptyEmoji: { fontSize: 48, opacity: 0.4 },
+  emptyTitle: { ...Typography.h3, color: Colors.cream },
+  emptyText: { ...Typography.body, color: Colors.silver, textAlign: 'center', lineHeight: 22 },
 });
