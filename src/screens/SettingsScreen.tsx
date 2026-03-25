@@ -8,12 +8,20 @@ import { supabase } from '../lib/supabase';
 export default function SettingsScreen({ navigation }: { navigation?: any }) {
   const { user, signOut } = useAuthStore();
   const [isPublic, setIsPublic] = useState(true);
+  const [cartIsPublic, setCartIsPublic] = useState(false);
 
   useEffect(() => {
     if (user) {
-      supabase.from('profiles').select('is_public').eq('id', user.id).single()
-        .then(({ data }) => {
-           if (data) setIsPublic(data.is_public);
+      supabase.from('profiles').select('is_public, cart_is_public').eq('id', user.id).single()
+        .then(({ data, error }) => {
+          if (error) {
+            console.warn('[SettingsScreen] profile load error:', error);
+            return;
+          }
+          if (data) {
+            setIsPublic(data.is_public);
+            if (typeof data.cart_is_public === 'boolean') setCartIsPublic(data.cart_is_public);
+          }
         });
     }
   }, [user]);
@@ -27,6 +35,18 @@ export default function SettingsScreen({ navigation }: { navigation?: any }) {
     } catch (e) {
       console.warn('Failed to update privacy settings', e);
       setIsPublic(!val); // Revert
+    }
+  };
+
+  const toggleCartPublic = async (val: boolean) => {
+    setCartIsPublic(val);
+    if (!user) return;
+    try {
+      const { error } = await supabase.from('profiles').update({ cart_is_public: val }).eq('id', user.id);
+      if (error) throw error;
+    } catch (e) {
+      console.warn('Failed to update cart visibility', e);
+      setCartIsPublic(!val); // Revert
     }
   };
 
@@ -78,6 +98,14 @@ export default function SettingsScreen({ navigation }: { navigation?: any }) {
       {renderSection('Privacy', <>
         {renderRow('👁', 'Public Profile Visibility', 
           <Switch value={isPublic} onValueChange={togglePublic} trackColor={{ false: Colors.charcoal, true: Colors.accent }} thumbColor={Colors.cream} />
+        )}
+        {renderRow('🛍️', 'Public Cart Visibility',
+          <Switch
+            value={cartIsPublic}
+            onValueChange={toggleCartPublic}
+            trackColor={{ false: Colors.charcoal, true: Colors.accent }}
+            thumbColor={Colors.cream}
+          />
         )}
         {renderRow('📊', 'Data & Analytics', <Text style={styles.chevron}>›</Text>)}
         {renderRow('🗑', 'Delete Account', <Text style={styles.chevron}>›</Text>, true, true)}

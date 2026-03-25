@@ -87,9 +87,14 @@ export default function FollowerFeedScreen({ navigation }: { navigation?: any })
             return (
               <View style={styles.postCard}>
                 <View style={styles.postHeader}>
-                  <View style={styles.userAvatar}>
-                    <Text style={styles.userAvatarText}>{initial}</Text>
-                  </View>
+                  <TouchableOpacity
+                    onPress={() => navigation?.navigate('SharedCart', { ownerId: item.user_id })}
+                    accessibilityRole="button"
+                  >
+                    <View style={styles.userAvatar}>
+                      <Text style={styles.userAvatarText}>{initial}</Text>
+                    </View>
+                  </TouchableOpacity>
                   <View style={styles.userInfo}>
                     <Text style={styles.userName}>@{userName.replace(/\s+/g, '').toLowerCase()}</Text>
                     <Text style={styles.postTime}>{timeAgo} {hours > 0 ? 'ago' : ''}</Text>
@@ -110,7 +115,10 @@ export default function FollowerFeedScreen({ navigation }: { navigation?: any })
                       <Text style={[styles.actionIcon, hasLiked && { color: Colors.accent }]}>{hasLiked ? '♥' : '♡'}</Text>
                       <Text style={styles.actionCount}>{likesArray.length}</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.actionBtn}>
+                    <TouchableOpacity
+                      style={styles.actionBtn}
+                      onPress={() => navigation?.navigate('PostComments', { postId: item.id })}
+                    >
                       <Text style={styles.actionIcon}>💬</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.actionBtn}>

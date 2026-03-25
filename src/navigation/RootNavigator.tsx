@@ -16,6 +16,8 @@ import BodyRatioScreen from '../screens/BodyRatioScreen';
 import GroupChatScreen from '../screens/GroupChatScreen';
 import HairstyleStudioScreen from '../screens/HairstyleStudioScreen';
 import PremiumCartScreen from '../screens/PremiumCartScreen';
+import PostCommentsScreen from '../screens/PostCommentsScreen';
+import SharedCartScreen from '../screens/SharedCartScreen';
 
 export type RootStackParamList = {
   Splash: undefined;
@@ -32,6 +34,8 @@ export type RootStackParamList = {
   GroupChat: undefined;
   HairstyleStudio: undefined;
   PremiumCart: undefined;
+  PostComments: { postId: string };
+  SharedCart: { ownerId: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -63,6 +67,8 @@ export default function RootNavigator() {
         <Stack.Screen name="GroupChat" component={GroupChatScreen} />
         <Stack.Screen name="HairstyleStudio" component={HairstyleStudioScreen} />
         <Stack.Screen name="PremiumCart" component={PremiumCartScreen} />
+        <Stack.Screen name="PostComments" component={PostCommentsScreen} />
+        <Stack.Screen name="SharedCart" component={SharedCartScreen} />
       </Stack.Group>
     </Stack.Navigator>
   );

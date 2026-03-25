@@ -41,6 +41,29 @@ export default function OOTDPostScreen({ navigation }: { navigation?: any }) {
       return;
     }
 
+    // Enforce “one OOTD per day” (local device timezone).
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    const startOfTomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0);
+
+    const { data: existingToday } = await supabase
+      .from('posts')
+      .select('id')
+      .eq('user_id', user.id)
+      .gte('created_at', startOfToday.toISOString())
+      .lt('created_at', startOfTomorrow.toISOString())
+      .limit(1);
+
+    if (existingToday && existingToday.length > 0) {
+      Alert.alert('Already posted today', 'You can post your OOTD once per day. Come back tomorrow!');
+      return;
+    }
+
     setIsPosting(true);
     try {
       // 1. Upload Image to Supabase Storage
@@ -67,6 +90,32 @@ export default function OOTDPostScreen({ navigation }: { navigation?: any }) {
       });
 
       if (dbError) throw dbError;
+
+      // 4. Update daily streak counters on the user profile (if columns exist).
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('ootd_streak, ootd_last_post_date')
+          .eq('id', user.id)
+          .single();
+
+        const currentStreak = profile?.ootd_streak ?? 0;
+        const lastPostDate = profile?.ootd_last_post_date ?? null;
+
+        const nextStreak = lastPostDate === yesterdayStr ? currentStreak + 1 : 1;
+
+        await supabase.from('profiles').upsert(
+          {
+            id: user.id,
+            ootd_last_post_date: todayStr,
+            ootd_streak: nextStreak,
+          },
+          { onConflict: 'id' }
+        );
+      } catch (e) {
+        // Non-fatal: app still posts. Schema may not yet have streak columns.
+        console.warn('[OOTDPostScreen] streak update skipped:', e);
+      }
 
       Alert.alert('Success', 'Your OOTD is now live!');
       navigation?.navigate('Main', { screen: 'Home' });

@@ -19,11 +19,29 @@ export default function ProfileScreen({ navigation }: { navigation?: any }) {
   const [outfits, setOutfits] = useState<any[]>([]);
   const [saved, setSaved] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [ootdStreak, setOotdStreak] = useState<number>(0);
+  const [lastPostDate, setLastPostDate] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
     const fetchProfileData = async () => {
       setLoading(true);
+      // Fetch streak fields if your DB has them.
+      try {
+        const { data: profileRow } = await supabase
+          .from('profiles')
+          .select('ootd_streak, ootd_last_post_date')
+          .eq('id', user.id)
+          .single();
+        if (profileRow) {
+          setOotdStreak(profileRow.ootd_streak ?? 0);
+          setLastPostDate(profileRow.ootd_last_post_date ?? null);
+        }
+      } catch (e) {
+        // Non-fatal for schema mismatch.
+        console.warn('[ProfileScreen] streak fields not available:', e);
+      }
+
       // Fetch user's posts
       const { data: postsData } = await supabase
         .from('posts')
@@ -68,6 +86,16 @@ export default function ProfileScreen({ navigation }: { navigation?: any }) {
       <View style={styles.bioSection}>
         <Text style={styles.username}>@{user?.name?.replace(/\s+/g, '').toLowerCase() || 'myoutfit'}</Text>
         <Text style={styles.bio}>Fashion is a language. Dress like you mean it. ✦</Text>
+        <View style={{ gap: 4 }}>
+          <Text style={{ ...Typography.caption, color: Colors.accent }}>
+            Daily OOTD Streak: {ootdStreak} day{ootdStreak === 1 ? '' : 's'}
+          </Text>
+          {lastPostDate ? (
+            <Text style={{ ...Typography.caption, color: Colors.silver }}>
+              Last post: {lastPostDate}
+            </Text>
+          ) : null}
+        </View>
          <View style={styles.statsRow}>
           {[
             { label: 'Outfits', value: outfits.length.toString(), route: 'History' },
@@ -81,8 +109,11 @@ export default function ProfileScreen({ navigation }: { navigation?: any }) {
           ))}
         </View>
         <View style={styles.actionRow}>
-          <TouchableOpacity style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>Edit Profile</Text>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={() => navigation?.navigate('OOTDPost')}
+          >
+            <Text style={styles.primaryButtonText}>Post OOTD</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.iconButton}
@@ -115,7 +146,16 @@ export default function ProfileScreen({ navigation }: { navigation?: any }) {
           <ActivityIndicator size="large" color={Colors.accent} style={{ marginTop: 20 }} />
         ) : displayItems.length > 0 ? (
           displayItems.map((item, i) => (
-            <TouchableOpacity key={item.id || i} style={[styles.gridItem, { overflow: 'hidden' }]}>
+                <TouchableOpacity
+                  key={item.id || i}
+                  style={[styles.gridItem, { overflow: 'hidden' }]}
+                  onPress={() => {
+                    // Only real OOTD posts can have comments; Wishlist/Saved items should not open comments.
+                    if (activeTab !== 'Saved' && item?.id) {
+                      navigation?.navigate('PostComments', { postId: item.id });
+                    }
+                  }}
+                >
               {item.image_url ? (
                 <Image source={{ uri: item.image_url }} style={{ width: '100%', height: '100%' }} />
               ) : (

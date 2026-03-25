@@ -2,6 +2,7 @@
   "expo": {
     "name": "MY outfit",
     "slug": "my-outfit",
+    "scheme": "my-outfit",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
