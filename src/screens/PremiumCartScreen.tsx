@@ -18,6 +18,7 @@ export default function PremiumCartScreen({ navigation }: { navigation?: any }) 
   const [price, setPrice] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [saving, setSaving] = useState(false);
+  const [fetchingMeta, setFetchingMeta] = useState(false);
 
   useEffect(() => {
     fetchCart();
@@ -33,6 +34,23 @@ export default function PremiumCartScreen({ navigation }: { navigation?: any }) 
       .order('created_at', { ascending: false });
     if (data) setItems(data);
     setLoading(false);
+  };
+
+  const fetchMetadata = async () => {
+    if (!url) return;
+    setFetchingMeta(true);
+    try {
+      const res = await fetch(`https://api.microlink.io?url=${encodeURIComponent(url)}`);
+      const json = await res.json();
+      if (json.status === 'success') {
+        if (json.data.title) setTitle(json.data.title);
+        if (json.data.image?.url) setImageUrl(json.data.image.url);
+      }
+    } catch (e) {
+      console.warn('Metadata fetch failed:', e);
+    } finally {
+      setFetchingMeta(false);
+    }
   };
 
   const handleAddItem = async () => {
@@ -112,8 +130,14 @@ export default function PremiumCartScreen({ navigation }: { navigation?: any }) 
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Save External Item</Text>
             
+            <View style={styles.urlRow}>
+              <TextInput style={[styles.input, { flex: 1, marginBottom: 0 }]} placeholder="Store URL (Myntra, ASOS...)" placeholderTextColor={Colors.silver} value={url} onChangeText={setUrl} autoCapitalize="none" keyboardType="url" />
+              <TouchableOpacity style={styles.fetchBtn} onPress={fetchMetadata} disabled={fetchingMeta || !url}>
+                {fetchingMeta ? <ActivityIndicator size="small" color={Colors.obsidian} /> : <Text style={styles.fetchBtnText}>Fetch</Text>}
+              </TouchableOpacity>
+            </View>
+
             <TextInput style={styles.input} placeholder="Product Name (e.g. Nike Dunks)" placeholderTextColor={Colors.silver} value={title} onChangeText={setTitle} />
-            <TextInput style={styles.input} placeholder="Store URL (Myntra, ASOS...)" placeholderTextColor={Colors.silver} value={url} onChangeText={setUrl} autoCapitalize="none" keyboardType="url" />
             <TextInput style={styles.input} placeholder="Image URL (optional)" placeholderTextColor={Colors.silver} value={imageUrl} onChangeText={setImageUrl} autoCapitalize="none" keyboardType="url" />
             <TextInput style={styles.input} placeholder="Price (optional)" placeholderTextColor={Colors.silver} value={price} onChangeText={setPrice} keyboardType="numeric" />
 
@@ -159,6 +183,9 @@ const styles = StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: Colors.charcoal, padding: 24, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   modalTitle: { ...Typography.h2, color: Colors.cream, marginBottom: 20 },
+  urlRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  fetchBtn: { backgroundColor: Colors.accent, paddingHorizontal: 16, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  fetchBtnText: { color: Colors.obsidian, fontWeight: '800', fontSize: 14 },
   input: { height: 50, backgroundColor: Colors.obsidian, borderRadius: 12, paddingHorizontal: 16, color: Colors.cream, marginBottom: 12, borderWidth: 1, borderColor: Colors.silver + '30' },
   modalActions: { flexDirection: 'row', gap: 12, marginTop: 12, marginBottom: 40 },
   cancelBtn: { flex: 1, height: 50, borderRadius: 16, backgroundColor: Colors.obsidian, alignItems: 'center', justifyContent: 'center' },

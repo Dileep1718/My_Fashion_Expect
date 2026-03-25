@@ -8,6 +8,8 @@ import {
   FlatList,
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp, useRoute } from '@react-navigation/native';
@@ -122,7 +124,11 @@ export default function PostCommentsScreen({ navigation }: { navigation?: Native
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView 
+      style={styles.container} 
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+    >
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation?.goBack()} style={styles.backBtn}>
           <Text style={styles.backText}>‹ Back</Text>
@@ -156,6 +162,8 @@ export default function PostCommentsScreen({ navigation }: { navigation?: Native
         />
       )}
 
+      {/* Put the input bar in a standard container instead of position absolute,
+          so KeyboardAvoidingView pushes it up cleanly. */}
       <View style={styles.inputBar}>
         <TextInput
           style={styles.input}
@@ -169,7 +177,7 @@ export default function PostCommentsScreen({ navigation }: { navigation?: Native
           {submitting ? <ActivityIndicator color={Colors.obsidian} /> : <Text style={styles.sendText}>Send</Text>}
         </TouchableOpacity>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
