@@ -1,0 +1,66 @@
+MY OUTFIT - PROJECT SETUP REQUIREMENTS
+======================================
+
+1. TECH STACK
+-------------
+* Frontend SDK: React Native (Expo) - SDK 55
+* Routing: Expo Router (App Router)
+* Styling: Tailwind CSS (via NativeWind)
+* State Management: Zustand
+* Backend System: Supabase (PostgreSQL, Authentication & Storage)
+* AI Models: Google Gemini 1.5 Flash (for wardrobe matching), Fashn.ai (for image try-on generator)
+
+2. ENVIRONMENT VARIABLES (.env)
+-------------------------------
+To run this application locally or build it, you must create a `.env` file at the root of the project with the following keys:
+- EXPO_PUBLIC_SUPABASE_URL=your_supabase_project_url
+- EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_api_key
+- EXPO_PUBLIC_GEMINI_API_KEY=your_google_cloud_gemini_key
+- EXPO_PUBLIC_FASHN_API_KEY=your_fashn_dev_key
+
+3. REQUIREMENT CHECKLIST - SUPABASE CONFIGURATION
+-------------------------------------------------
+Whoever imports or hosts this project MUST configure their Supabase Dashboard as follows:
+
+[A] AUTHENTICATION
+* Go to Authentication -> Providers -> Email:
+    - Turn ON "Enable Email Provider"
+    - Turn OFF "Confirm email" (for fast development/registration testing)
+* Go to Authentication -> Providers -> Google / Apple:
+    - Supply the Client IDs and Secrets generated from Google Cloud Console & Apple Developer Program.
+* Go to Authentication -> URL Configuration -> Redirect URLs:
+    - You must add: `exp://*` (for Expo Go)
+    - You must add: `my-outfit://**` (for Native Android/iOS deep-links)
+
+[B] DATABASE TABLES
+* The app automatically creates tables using the `migrations` folder, but it expects these schemas in `public`:
+    - `profiles`: user metadata, `cart_is_public` (boolean), `ootd_streak` (integer)
+    - `posts`: public OOTD feed
+    - `likes` / `comments`: social interactions
+    - `cart_items`: saved outfits
+
+[C] STORAGE BUCKETS
+* You MUST create a Storage Bucket named: `app_images`
+* The bucket must be explicitly flagged as "Public" in its settings.
+
+[D] ROW LEVEL SECURITY (RLS)
+The app_images bucket requires the following explicit SQL to allow React Native passing uploads through the REST API:
+
+CREATE POLICY "app_images_insert" ON storage.objects FOR INSERT TO public WITH CHECK (bucket_id = 'app_images' AND auth.role() = 'authenticated');
+CREATE POLICY "app_images_select" ON storage.objects FOR SELECT TO public USING (bucket_id = 'app_images');
+
+
+4. LOCAL START INSTRUCTIONS
+---------------------------
+1. Install dependencies: 
+   `npm install`
+2. Start the bundler for Expo Go testing:
+   `npx expo start --clear`
+3. Hit `w` in the terminal to view in Browser, or `a`/`i` to launch in simulators.
+
+5. NATIVE EXPORT / EAS CLI COMPILATION
+--------------------------------------
+To build the actual .aab or .ipa for the Google Play Store / Apple App Store:
+1. `npm install -g eas-cli`
+2. `eas login`
+3. `eas build -p android --profile production`
