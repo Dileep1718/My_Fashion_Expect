@@ -32,12 +32,30 @@ interface AuthState {
   isLoading: boolean;
   error: string | null;
 
+  // Actions
+  initSession: () => void;
   completeOnboarding: () => void;
   signIn: (email: string, pass: string) => Promise<void>;
   signUp: (email: string, pass: string, name: string) => Promise<void>;
   signOut: () => Promise<void>;
   updatePreferences: (styles: string[], palette: string | null) => void;
   clearError: () => void;
+}
+
+// Helper: build a User object from a Supabase auth user + profile row
+async function buildUser(authUser: any): Promise<User> {
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', authUser.id)
+    .single();
+
+  return {
+    id: authUser.id,
+    email: authUser.email || '',
+    name: profile?.name || profile?.nickname || authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'User',
+    stylePreferences: profile?.style_preferences,
+  };
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -48,6 +66,35 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       isLoading: false,
       error: null,
+
+      // ── Called once on app mount ──────────────────────────────────────
+      initSession: () => {
+        // Restore existing session immediately
+        supabase.auth.getSession().then(async ({ data: { session } }) => {
+          if (session?.user) {
+            try {
+              const user = await buildUser(session.user);
+              set({ isAuthenticated: true, user });
+            } catch (_) { /* ignore */ }
+          } else {
+            set({ isAuthenticated: false, user: null });
+          }
+        });
+
+        // Subscribe to future auth events (token refresh, sign-in, sign-out)
+        supabase.auth.onAuthStateChange(async (event, session) => {
+          if (event === 'SIGNED_OUT' || !session) {
+            set({ isAuthenticated: false, user: null });
+            return;
+          }
+          if (session?.user) {
+            try {
+              const user = await buildUser(session.user);
+              set({ isAuthenticated: true, user });
+            } catch (_) { /* ignore */ }
+          }
+        });
+      },
 
       completeOnboarding: () => set({ hasOnboarded: true }),
 

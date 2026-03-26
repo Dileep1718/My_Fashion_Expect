@@ -52,21 +52,28 @@ export default function OOTDPostScreen({ navigation }: { navigation?: any }) {
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
     const startOfTomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0);
 
-    const { data: existingToday } = await supabase
-      .from('posts')
-      .select('id')
-      .eq('user_id', user.id)
-      .gte('created_at', startOfToday.toISOString())
-      .lt('created_at', startOfTomorrow.toISOString())
-      .limit(1);
-
-    if (existingToday && existingToday.length > 0) {
-      Alert.alert('Already posted today', 'You can post your OOTD once per day. Come back tomorrow!');
-      return;
-    }
-
     setIsPosting(true);
     try {
+      // 0. Verify Auth Session first (crucial for RLS policies)
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session?.user) {
+        throw new Error('Your login session has expired. Please sign out and sign back in to post.');
+      }
+
+      const { data: existingToday } = await supabase
+        .from('posts')
+        .select('id')
+        .eq('user_id', user.id)
+        .gte('created_at', startOfToday.toISOString())
+        .lt('created_at', startOfTomorrow.toISOString())
+        .limit(1);
+
+      if (existingToday && existingToday.length > 0) {
+        Alert.alert('Already posted today', 'You can post your OOTD once per day. Come back tomorrow!');
+        setIsPosting(false);
+        return;
+      }
+
       // 1. Upload Image to Supabase Storage
       // Use base64 → decode() — same pattern as VirtualClosetScreen / TryOnScreen.
       // fetch(localUri) fails on Android with "Network request failed".
@@ -132,7 +139,11 @@ export default function OOTDPostScreen({ navigation }: { navigation?: any }) {
       navigation?.navigate('Main', { screen: 'Home' });
       
     } catch (e: any) {
-      Alert.alert('Post Failed', e.message || 'Something went wrong');
+      console.error('[OOTDPostScreen Error]:', e);
+      Alert.alert(
+        'Post Failed',
+        e.message?.includes('JWT') ? 'Session expired. Please log out and back in.' : (e.message || 'Something went wrong. Please check your connection.')
+      );
     } finally {
       setIsPosting(false);
     }

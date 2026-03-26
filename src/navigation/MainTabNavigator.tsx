@@ -8,14 +8,14 @@ import { Colors } from '../constants/colors';
 // Screens
 import HomeFeedScreen from '../screens/HomeFeedScreen';
 import SearchScreen from '../screens/SearchScreen';
-import TryOnScreen from '../screens/TryOnScreen';
+import FashionAIScreen from '../screens/FashionAIScreen';
 import VirtualClosetScreen from '../screens/VirtualClosetScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 
 export type MainTabParamList = {
   Home: undefined;
   Search: undefined;
-  TryOn: undefined;
+  FashionAI: undefined;
   Closet: undefined;
   Profile: undefined;
 };
@@ -25,7 +25,7 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 const TAB_ICONS: Record<string, string> = {
   Home: '⌂',
   Search: '⌕',
-  TryOn: '✦',
+  FashionAI: '✦',
   Closet: '◻',
   Profile: '◉',
 };
@@ -46,7 +46,7 @@ export default function MainTabNavigator() {
         tabBarIcon: ({ focused }: { focused: boolean }) => <TabIcon name={route.name} focused={focused} />,
         tabBarLabel: ({ focused }: { focused: boolean }) => (
           <Text style={[styles.label, focused && styles.labelActive]}>
-            {route.name === 'TryOn' ? 'Try-On' : route.name}
+            {route.name === 'FashionAI' ? 'AI Chat' : route.name}
           </Text>
         ),
         tabBarStyle: styles.tabBar,
@@ -55,7 +55,7 @@ export default function MainTabNavigator() {
     >
       <Tab.Screen name="Home" component={HomeFeedScreen} />
       <Tab.Screen name="Search" component={SearchScreen} />
-      <Tab.Screen name="TryOn" component={TryOnScreen} />
+      <Tab.Screen name="FashionAI" component={FashionAIScreen} />
       <Tab.Screen name="Closet" component={VirtualClosetScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>

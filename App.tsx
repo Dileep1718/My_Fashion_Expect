@@ -9,7 +9,10 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { supabase } from './src/lib/supabase';
 
 export default function App() {
+  const initSession = useAuthStore((s) => s.initSession);
+
   useEffect(() => {
+<<<<<<< HEAD
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser?.email) {
         // Lookup the native PostgreSQL UUID attached to this Firebase email
@@ -40,6 +43,10 @@ export default function App() {
     });
 
     return () => unsubscribe();
+=======
+    // Restores persisted session and subscribes to token refresh / sign-out events
+    initSession();
+>>>>>>> 46973d8 (feat: Add NOVA Fashion AI with closet vision, fix RLS on posts, and add native voice dictation hint)
   }, []);
 
   return (

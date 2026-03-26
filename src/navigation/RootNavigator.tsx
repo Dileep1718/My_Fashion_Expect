@@ -10,6 +10,7 @@ import OOTDPostScreen from '../screens/OOTDPostScreen';
 import FitCheckScreen from '../screens/FitCheckScreen';
 import FollowerFeedScreen from '../screens/FollowerFeedScreen';
 import OutfitSuggestionScreen from '../screens/OutfitSuggestionScreen';
+import TryOnScreen from '../screens/TryOnScreen';
 import HistoryScreen from '../screens/HistoryScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import BodyRatioScreen from '../screens/BodyRatioScreen';
@@ -33,6 +34,7 @@ export type RootStackParamList = {
   FitCheck: undefined;
   FollowerFeed: undefined;
   OutfitSuggestion: undefined;
+  TryOn: undefined;
   History: undefined;
   Settings: undefined;
   BodyRatio: undefined;
@@ -71,6 +73,7 @@ export default function RootNavigator() {
         <Stack.Screen name="FitCheck" component={FitCheckScreen} />
         <Stack.Screen name="FollowerFeed" component={FollowerFeedScreen} />
         <Stack.Screen name="OutfitSuggestion" component={OutfitSuggestionScreen} />
+        <Stack.Screen name="TryOn" component={TryOnScreen} />
         <Stack.Screen name="History" component={HistoryScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="BodyRatio" component={BodyRatioScreen} />

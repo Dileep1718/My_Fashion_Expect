@@ -1,6 +1,5 @@
-// src/screens/VirtualClosetScreen.tsx (The Wardrobe)
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, Modal, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, Modal, ActivityIndicator, Dimensions, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { decode } from 'base64-arraybuffer';
 import { Colors } from '../constants/colors';
@@ -27,6 +26,7 @@ export default function VirtualClosetScreen({ navigation }: { navigation?: any }
   }, [activeTab]);
 
   const fetchWardrobe = async () => {
+    if (!user) { setLoading(false); return; }
     setLoading(true);
     if (!user) return;
     const { data } = await supabase
@@ -85,9 +85,9 @@ export default function VirtualClosetScreen({ navigation }: { navigation?: any }
       } else {
         setActiveTab(category); // switch tab which auto-refreshes
       }
-    } catch (e) {
-      console.error(e);
-      alert('Fail to upload item.');
+    } catch (e: any) {
+      console.error('[Upload Error]:', e);
+      Alert.alert('Upload Failed', e.message || 'Failed to add item to your wardrobe. Please check your connection and try again.');
     } finally {
       setUploading(false);
     }
